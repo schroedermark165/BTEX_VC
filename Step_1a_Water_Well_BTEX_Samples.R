@@ -284,7 +284,7 @@ summary_btex_cases <- sf_water3 %>%
                   names_sep = "; ",
                   values_from = c(Result, `Detection Limit`),
                   names_vary = "slowest",
-                  values_fn = mean)
+                  values_fn = toString)
 length(unique(summary_btex_cases$facility_id))
 
 summary_btex_cases_mean <- sf_water3 %>%

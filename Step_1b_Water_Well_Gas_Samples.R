@@ -28,7 +28,7 @@ arc.check_product()
 # Load Initial Data -------------------------------------------------------
 rm(list = ls())
 
-d_wattenberg <- arc.open("D:\\Google Drive\\ArcGIS\\DJ_Basin_BTEX_Study\\Data\\1_Geodatabase\\Base_Features.gdb\\Wattenberg_Field_UTM_polygon")
+d_wattenberg <- arc.open("Input\\Base_Features.gdb\\Wattenberg_Field_UTM_polygon")
 sf_wattenberg <- arc.select(d_wattenberg, where_clause = "description = '2020 revision'")
 sf_wattenberg <- arc.data2sf(sf_wattenberg)
 
@@ -110,7 +110,9 @@ sf_gas_wd2 <- st_join(sf_gas_wd, sf_wattenberg, join = st_within) %>%
    mutate(wattenberg = ifelse(is.na(description), "FALSE", "TRUE")) %>%
    select(-c(OBJECTID, description))
 
-output <- data.frame(sf_gas_wd2) %>% select(-geometry)
+Water_Wells_Sampled_Methane_Isotope <- data.frame(sf_gas_wd2) %>% select(-geometry)
+
+# saveRDS(Water_Wells_Sampled_Methane_Isotope, "Intermediate/Water_Wells_Sampled_Methane_Isotope.RDS")
 
 # Write Output ------------------------------------------------------------
 # feature_name_gas <- paste("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_GAS_",
@@ -120,4 +122,4 @@ output <- data.frame(sf_gas_wd2) %>% select(-geometry)
 #           data = sf_gas_wd2,
 #           shape_info = list(type = "Point", WKID = 26913),
 #           overwrite = TRUE)
-write.xlsx(output, paste0("Output/Water_Wells_Sampled_Methane_Isotope_", Sys.Date(), ".xlsx"))
+# write.xlsx(Water_Wells_Sampled_Methane_Isotope, paste0("Output/Water_Wells_Sampled_Methane_Isotope_", Sys.Date(), ".xlsx"))

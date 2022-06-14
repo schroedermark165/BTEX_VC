@@ -28,6 +28,13 @@ arc.check_product()
 # Load Initial Data -------------------------------------------------------
 rm(list = ls())
 
+# Methane data from Step_1b_Water_Well_Gas_Samples.R
+d_isotope <- readRDS("Intermediate/Water_Wells_Sampled_Methane_Isotope.RDS") %>%
+         mutate(sample_date = as.Date(sample_date),
+                facility_id = as.character(facility_id)) %>%
+         select(facility_id, sample_date, methane, ethane, propane, delta_13c_c1, fraction, origin)
+
+# Read original well/sample/results datasets
 water_wells <- read_csv("Input/Step_1_Original_Data/DL_Locations.csv", 
                         col_types = cols(PermitNumber = col_character(), 
                                          ReceiptNumber = col_character())) %>% clean_names()
@@ -35,6 +42,7 @@ samples  <- read_csv("Input/Step_1_Original_Data/DL_Samples.csv") %>%
    mutate(`Sample Date` = as.Date(`Sample Date`, format="%m/%d/%Y")) %>% clean_names()
 results <- read.csv("Input/Step_1_Original_Data/DL_Results.csv")  %>% clean_names()      # use "read.csv()" because of per-mille char encoding
 
+# Manually collected water well data (permits, etc)
 well_info <- read.xlsx("Input/BTEX_Wells_DWR_Info.xlsx") %>%
    clean_names() %>%
    mutate(facility_id = as.character(facility_id))
@@ -229,7 +237,7 @@ sf_water_wd <- st_as_sf(d_water_wd,
                         coords = c("x", "y"),
                         crs = 26913)
 
-d_wattenberg <- arc.open("D:\\Google Drive\\ArcGIS\\DJ_Basin_BTEX_Study\\Data\\1_Geodatabase\\Base_Features.gdb\\Wattenberg_Field_UTM_polygon")
+d_wattenberg <- arc.open("Input\\Base_Features.gdb\\Wattenberg_Field_UTM_polygon")
 sf_wattenberg <- arc.select(d_wattenberg, where_clause = "description = '2020 revision'")
 sf_wattenberg <- arc.data2sf(sf_wattenberg)
 
@@ -248,25 +256,15 @@ sf_water_wd2 <- st_join(sf_water_wd, sf_wattenberg, join = st_within) %>%
    select(-geometry) %>%
    filter(!facility_id %in% as.list(exclude_facids$facility_id)) %>%
    mutate(facility_id = as.character(facility_id),
-          across(11:23, ~replace_na(., 0))) %>%
+          across(`benzene_ugl`:`sum_alk_4-6`, ~replace_na(., 0))) %>%
    # Convert booleans to character for importing to GIS
    mutate(across(c(sample_date, detected_btex:wattenberg), as.character))
 
 summary_export <- as.data.frame(sf_water_wd2) %>% 
    select(-geometry) %>%
-   mutate(sample_date = as.Date(sample_date))
-
-# read isotope data from gas samples (diff sample_id than water samples)
-d_isotope <- read.xlsx("Output/Water_Wells_Sampled_Methane_Isotope_2021-07-14.xlsx") %>%
-   mutate(sample_date = as.Date(sample_date),
-          facility_id = as.character(facility_id)) %>%
-   select(facility_id, sample_date, methane, ethane, propane, delta_13c_c1, fraction, origin)
-
-# join isotope data by facid and sampledate
-summary_export <- summary_export %>%
+   mutate(sample_date = as.Date(sample_date)) %>%
    left_join(d_isotope, by = c("facility_id", "sample_date")) %>%
    left_join(well_info, by = c("facility_id")) %>%
-   select(permit_number.x, permit_number.y, receipt_number.x, receipt_number.y) %>%
    mutate(permit_number = case_when((is.na(permit_number.x) & !is.na(permit_number.y)) ~ permit_number.y,
                                     (!is.na(permit_number.x) & is.na(permit_number.y)) ~ permit_number.x,
                                     permit_number.x == permit_number.y ~ permit_number.x),
@@ -277,14 +275,8 @@ summary_export <- summary_export %>%
    select(-c(permit_number.x, permit_number.y, receipt_number.x, receipt_number.y))
 
 write.xlsx(summary_export,
-           paste0("Output/Final_Exports/BTEX_Cases_", Sys.Date(),".xlsx"),
+           paste0("Output/Final_Exports/BTEX_Methane_Summary_Table_Exported_", Sys.Date(),".xlsx"),
            firstRow=TRUE,
            withFilter=TRUE,
            colWidths="auto",
            overwrite=TRUE)
-
-
-# Data analysis from summary ----------------------------------------------
-skimr::skim(summary_export)
-
-
