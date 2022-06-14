@@ -135,11 +135,6 @@ results_water <- bind_rows(results_water_btex_det, results_water_ch4)
 
 # Bind the BTEX (both detected and not) with methane (both detected and not)
 results_water_nd <- bind_rows(results_water_btex, results_water_ch4)
-# %>%
-#    distinct(sample_id, chem_class) %>%
-#    group_by(sample_id) %>%
-#    summarize(n = n()) %>%
-#    filter(n == 2)
 length(unique(results_water_nd$sample_id))
 
 # Join RESULT DATA with SAMPLE DATA ---------------------------------------
