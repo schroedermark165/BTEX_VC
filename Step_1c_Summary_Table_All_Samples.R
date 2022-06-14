@@ -68,6 +68,10 @@ nd_qual <- c("U", "UJ", "nd", "ND", "U, H", "<", "u")
 alkanes3 <- c("ETHANE", "PROPANE", "BUTANE", "PENTANE", "HEXANES",
               "ISOBUTANE", "ISOPENTANE")
 
+# Colorado MCLs
+MCLs <- data.frame(analyte = c("BENZENE", "TOLUENE", "ETHYLBENZENE", "TOTAL XYLENES"),
+                   co_mcl = c(5, 560, 700, 1400))
+
 # Water Well and Sample Information ---------------------------------------
 # Filter for sampled wells that are desired facilities
 wells_sel <- water_wells %>% filter(facility_type %in% facilities)
@@ -105,6 +109,8 @@ results_water_btex <- results %>%
                                 units %in% c("ug/L           ", "ug/l","ug/L", "UG/L") ~ "ug/L",
                                 TRUE ~ as.character(units))) %>%
       filter(units2 == "ug/L") %>%
+      # Add the Colorado MCLs
+      left_join(MCLs, by = c("param_description" = "analyte")) %>%
       # deal with records that are non-detect
       mutate(detection_limit = ifelse(detection_limit==0, 
                                       case_when(param_description == "BENZENE" ~ det_lims$dl_max[1],
@@ -117,6 +123,8 @@ results_water_btex <- results %>%
              result_ugL = case_when(result_value <= detection_limit ~ as.numeric(NA),
                                     qualifier %in% c("U", "<", "u", "nd", "ND") ~ as.numeric(NA),
                                     TRUE ~ result_ugL),
+             above_co_mcl = case_when(result_ugL >= co_mcl ~ TRUE,
+                                      TRUE ~ FALSE),
              sampled_for = 1)
 
 # Get all results for methane sampled in water
