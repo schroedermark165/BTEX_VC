@@ -299,7 +299,7 @@ summary_export <- as.data.frame(sf_water_wd2) %>%
       filter(complete.cases(utm_x83, utm_y83))
 
 write.xlsx(summary_export,
-           paste0("Output/Final_Exports/Summary_Table_Exported2_", Sys.Date(),".xlsx"),
+           paste0("Output/Final_Exports/Summary_Table_Exported_", Sys.Date(),".xlsx"),
            firstRow=TRUE,
            withFilter=TRUE,
            colWidths="auto",
