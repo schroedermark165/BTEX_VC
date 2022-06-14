@@ -179,7 +179,7 @@ d_water_nds <- samples_water %>%
       select(facility_id, facility_type, utm_x83, utm_y83, county, permit_number,
              receipt_number, well_depth, sample_id, sample_date, matrix, sample_reason,
              result_id, param_description, result_ugL, qualifier, units2,
-             detection_limit, chem_class, sampled_for)
+             detection_limit, chem_class, sampled_for, co_mcl, above_co_mcl)
 
 # Remove Trip Blanks and/or Contaminated Samples --------------------------
 
@@ -201,14 +201,19 @@ wells_tb_fail <- d_water_nds %>%
 # remove samples collected with contaminated trip blanks
 d_water2 <- d_water_nds %>%
       filter(!grepl("blank", sample_reason, ignore.case = T),
-             !sample_id %in% as.list(wells_tb_fail$sample_id))
+             !sample_id %in% as.list(wells_tb_fail$sample_id)) %>%
+      # Flag sample if above MCL
+      group_by(sample_id, facility_id, sample_date, above_co_mcl) %>%
+      mutate(btex_above_mcl = ifelse(sum(above_co_mcl) > 0, TRUE, FALSE)) %>%
+      ungroup()
 
 # Output and Tables for GIS -----------------------------------------------
 
 # Format output table of BTEX
 # Wide table of all samples and results for BTEX, CH4, and alkanes for easier reading
 d_water_wd <- d_water2 %>%
-      pivot_wider(id_cols = c(facility_id, facility_type, utm_x83, utm_y83, permit_number, receipt_number, well_depth, matrix, sample_id, sample_date),
+      pivot_wider(id_cols = c(facility_id, facility_type, utm_x83, utm_y83, permit_number,
+                              receipt_number, well_depth, matrix, sample_id, sample_date, btex_above_mcl),
                   names_from = c(param_description),
                   values_from = c(result_ugL),
                   values_fn = mean) %>%
@@ -226,7 +231,7 @@ d_water_wd <- d_water2 %>%
              pentane_mgl = `PENTANE`,
              hexanes_mgl = `HEXANES`) %>%
       relocate(c(benzene_ugl, toluene_ugl, ethylbenzene_ugl, mp_xylenes_ugl, o_xylene_ugl, tot_xylenes_ugl, methane_mgl),
-               .after = sample_date) %>%
+               .after = btex_above_mcl) %>%
       relocate(c(ethane_mgl, propane_mgl, butane_mgl, isobutane_mgl, pentane_mgl, hexanes_mgl),
                .after = methane_mgl) %>%
       clean_names() %>%
@@ -241,7 +246,8 @@ d_water_wd <- d_water2 %>%
              detected_ch4 = ifelse(!is.na(methane_mgl), TRUE, FALSE),
              detected_ethane_26 = ifelse(`sum_alk_2-6` > 0, TRUE, FALSE),
              detected_propane_36 = ifelse(`sum_alk_3-6` > 0, TRUE, FALSE),
-             detected_butane_46 = ifelse(`sum_alk_4-6` > 0, TRUE, FALSE))
+             detected_butane_46 = ifelse(`sum_alk_4-6` > 0, TRUE, FALSE),
+             btex_above_mcl = ifelse(is.na(btex_above_mcl), FALSE, btex_above_mcl))
 
 # This variable will tell whether analytes were sampled for
 sampled_for <- d_water2 %>%
@@ -301,9 +307,9 @@ summary_export <- as.data.frame(sf_water_wd2) %>%
                                         receipt_number.x == receipt_number.y ~ receipt_number.x)) %>%
       filter(!is.na(permit_number)) %>%
       select(-c(permit_number.x, permit_number.y, receipt_number.x, receipt_number.y, utm_x83.y, utm_y83.y,
-                facility_type.y)) %>%
+                facility_type.y, well_depth.y)) %>%
       rename(utm_x83 = utm_x83.x, utm_y83 = utm_y83.x,
-             facility_type = facility_type.x) %>%
+             facility_type = facility_type.x, well_depth = well_depth.x) %>%
       filter(complete.cases(utm_x83, utm_y83))
 
 write.xlsx(summary_export,
@@ -312,3 +318,5 @@ write.xlsx(summary_export,
            withFilter=TRUE,
            colWidths="auto",
            overwrite=TRUE)
+write_csv(summary_export,
+          paste0("Output/Final_Exports/Summary_Table_Exported_", Sys.Date(),".csv"))
