@@ -102,7 +102,8 @@ results_water_btex <- results %>%
       # Convert all units to ug/l
       mutate(chem_class = "BTEX",
              result_ugL = case_when(units == "mg/L" ~ result_value*1000,
-                                    units %in% c("ug/L", "UG/L") ~ result_value),
+                                    units %in% c("ug/L", "UG/L") ~ result_value,
+                                    TRUE ~ result_value),
              detection_limit = case_when(units == "mg/L" ~ detection_limit*1000,
                                          units %in% c("ug/L", "UG/L") ~ detection_limit),
              units2 = case_when(units == "mg/L" ~ "ug/L",
@@ -120,7 +121,7 @@ results_water_btex <- results %>%
                                                 param_description == "o-XYLENE" ~ det_lims$dl_max[5],
                                                 param_description == "TOTAL XYLENES" ~ det_lims$dl_max[6]),
                                       detection_limit),
-             result_ugL = case_when(result_value <= detection_limit ~ as.numeric(NA),
+             result_ugL = case_when(result_ugL <= detection_limit ~ as.numeric(NA),
                                     qualifier %in% c("U", "<", "u", "nd", "ND") ~ as.numeric(NA),
                                     TRUE ~ result_ugL),
              above_co_mcl = case_when(result_ugL >= co_mcl ~ TRUE,
@@ -128,7 +129,7 @@ results_water_btex <- results %>%
              sampled_for = 1)
 
 # Get all results for methane sampled in water
-# Make units consistent
+# Make units all mg/l
 results_water_ch4 <- results %>%
       filter(param_description == "METHANE") %>%
       mutate(result_ugL = case_when(units %in% c("mg/L", "MG/L", "mg/l", "ppm") ~ result_value,
@@ -146,7 +147,7 @@ results_water_ch4 <- results %>%
              sampled_for = 2)
 
 # Get all results for alkanes sampled in water
-# Make units consistent
+# Make units mg/l
 # Longer chain hydrocarbons indicate oil/gas presence because
 # microbes only really produce methane and maybe some ethane. They should not produce propane, etc
 # Filters for alkanes with 3+ carbons (propane -> hexane)
@@ -202,6 +203,7 @@ wells_tb_fail <- d_water_nds %>%
 d_water2 <- d_water_nds %>%
       filter(!grepl("blank", sample_reason, ignore.case = T),
              !sample_id %in% as.list(wells_tb_fail$sample_id)) %>%
+      replace_na(list(result_ugL=0)) %>%
       # Flag sample if above MCL
       group_by(sample_id, facility_id, sample_date, above_co_mcl) %>%
       mutate(btex_above_mcl = ifelse(sum(above_co_mcl) > 0, TRUE, FALSE)) %>%
@@ -216,7 +218,8 @@ d_water_wd <- d_water2 %>%
                               receipt_number, well_depth, matrix, sample_id, sample_date, btex_above_mcl),
                   names_from = c(param_description),
                   values_from = c(result_ugL),
-                  values_fn = mean) %>%
+                  values_fn = max
+                  ) %>%
       rename(benzene_ugl = `BENZENE`,
              toluene_ugl = `TOLUENE`,
              ethylbenzene_ugl = `ETHYLBENZENE`,
