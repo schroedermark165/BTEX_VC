@@ -22,43 +22,39 @@ library(openxlsx)
 library(ggsci)
 library(scales)
 library(gridExtra)
-library(mblm)
-library(arcgisbinding)
-library(sf)
-library(trend)
-arc.check_product()
 
 # FIGURE X. Bernard Plot --------------------------------------------------
 rm(list=ls())
 
-f_btex <- arc.open("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_BTEX_methane_20210302")
-f_gas <- arc.open("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_Gas_Data_20210213")
-d_btex <- arc.select(f_btex)
-d_gas <- arc.select(f_gas)
+# f_btex <- arc.open("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_BTEX_methane_20210302")
+# f_gas <- arc.open("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_Gas_Data_20210213")
+# d_btex <- arc.select(f_btex)
+# d_gas <- arc.select(f_gas)
+
+d_btex <- read_csv("Output/Final_Exports/Summary_Table_Exported_2022-06-16.csv")
 
 # Get list of unique BTEX occurrences by FACID and SampleDate
 btex_facid <- d_btex %>%
-      mutate(SampleDate = as.Date(SampleDate, format = "%Y-%m-%d")) %>%
-      distinct(FacilityID, SampleDate) %>%
-      mutate(key = paste(FacilityID, SampleDate))
+      distinct(facility_id, sample_date) %>%
+      mutate(key = paste(facility_id, sample_date))
+
+# FIX: SAMPLE ID for WATER SAMPLE  AND  GAS SAMPLES ARE DIFFERENT
+# ROWS DO NOT HAVE BOTH BTEX AND METHANE!!!
+
 
 # Clean gas samples from Wattenberg area
-gas_wattenberg <- d_gas %>%
-      filter(complete.cases(METHANE, ETHANE, PROPANE),
-             Wattenberg == "Wattenberg") %>%
-      mutate(SampleDate = as.Date(SampleDate, format = "%Y-%m-%d"),
-             key = paste(FacilityID, SampleDate),
-             fraction = METHANE/(ETHANE + PROPANE),
-             btex_det = case_when(key %in% as.list(btex_facid$key) ~ "Methane and BTEX",
-                                  TRUE ~ "No BTEX"),
-             ch4_origin = case_when((DELTA_13C_C1 <= -55.0 & fraction >= 100) ~ "Biogenic origin",
-                                    (DELTA_13C_C1 > -55.0 & fraction < 100) ~ "Thermogenic origin",
-                                    (DELTA_13C_C1 <= -55.0 & fraction < 100) ~ "Mixed origin")) %>%
-      select(-c(`OBJECTID`)) %>%
+gas_wattenberg <- d_btex %>%
+      filter(detected_btex == TRUE, 
+             detected_ch4 == TRUE, 
+             sampled_for_alkanes == TRUE) 
+
+mutate(key = paste(facility_id, sample_date),
+             fraction = methane_mgl/(ethane_mgl + propane_mgl),
+             ch4_origin = case_when((delta_13c_c1 <= -55.0 & fraction >= 100) ~ "Biogenic origin",
+                                    (delta_13c_c1 > -55.0 & fraction < 100) ~ "Thermogenic origin",
+                                    (delta_13c_c1 <= -55.0 & fraction < 100) ~ "Mixed origin")) %>%
       arrange(desc(btex_det))
 
-# Plot the ratio vs d13CC1 isotope
-btex_only <- gas_wattenberg %>% filter(btex_det == "Methane and BTEX")
 
 char_ch4_plot <- ggplot(gas_wattenberg, aes(x = `DELTA_13C_C1`, y = fraction, fill = btex_det)) +
       annotate("rect", xmin = -100, xmax = -55, ymin = 100, ymax = 1e5, alpha = 0.2) +
