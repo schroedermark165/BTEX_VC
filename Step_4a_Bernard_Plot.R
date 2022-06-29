@@ -22,43 +22,39 @@ library(openxlsx)
 library(ggsci)
 library(scales)
 library(gridExtra)
-library(mblm)
-library(arcgisbinding)
-library(sf)
-library(trend)
-arc.check_product()
 
 # FIGURE X. Bernard Plot --------------------------------------------------
 rm(list=ls())
 
-f_btex <- arc.open("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_BTEX_methane_20210302")
-f_gas <- arc.open("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_Gas_Data_20210213")
-d_btex <- arc.select(f_btex)
-d_gas <- arc.select(f_gas)
+# f_btex <- arc.open("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_BTEX_methane_20210302")
+# f_gas <- arc.open("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_Gas_Data_20210213")
+# d_btex <- arc.select(f_btex)
+# d_gas <- arc.select(f_gas)
+
+d_btex <- read_csv("Output/Final_Exports/Summary_Table_Exported_2022-06-16.csv")
 
 # Get list of unique BTEX occurrences by FACID and SampleDate
 btex_facid <- d_btex %>%
-   mutate(SampleDate = as.Date(SampleDate, format = "%Y-%m-%d")) %>%
-   distinct(FacilityID, SampleDate) %>%
-   mutate(key = paste(FacilityID, SampleDate))
+      distinct(facility_id, sample_date) %>%
+      mutate(key = paste(facility_id, sample_date))
+
+# FIX: SAMPLE ID for WATER SAMPLE  AND  GAS SAMPLES ARE DIFFERENT
+# ROWS DO NOT HAVE BOTH BTEX AND METHANE!!!
+
 
 # Clean gas samples from Wattenberg area
-gas_wattenberg <- d_gas %>%
-      filter(complete.cases(METHANE, ETHANE, PROPANE),
-             Wattenberg == "Wattenberg") %>%
-      mutate(SampleDate = as.Date(SampleDate, format = "%Y-%m-%d"),
-             key = paste(FacilityID, SampleDate),
-             fraction = METHANE/(ETHANE + PROPANE),
-             btex_det = case_when(key %in% as.list(btex_facid$key) ~ "Methane and BTEX",
-                                  TRUE ~ "No BTEX"),
-             ch4_origin = case_when((DELTA_13C_C1 <= -55.0 & fraction >= 100) ~ "Biogenic origin",
-                                    (DELTA_13C_C1 > -55.0 & fraction < 100) ~ "Thermogenic origin",
-                                    (DELTA_13C_C1 <= -55.0 & fraction < 100) ~ "Mixed origin")) %>%
-      select(-c(`OBJECTID`)) %>%
+gas_wattenberg <- d_btex %>%
+      filter(detected_btex == TRUE, 
+             detected_ch4 == TRUE, 
+             sampled_for_alkanes == TRUE) 
+
+mutate(key = paste(facility_id, sample_date),
+             fraction = methane_mgl/(ethane_mgl + propane_mgl),
+             ch4_origin = case_when((delta_13c_c1 <= -55.0 & fraction >= 100) ~ "Biogenic origin",
+                                    (delta_13c_c1 > -55.0 & fraction < 100) ~ "Thermogenic origin",
+                                    (delta_13c_c1 <= -55.0 & fraction < 100) ~ "Mixed origin")) %>%
       arrange(desc(btex_det))
 
-# Plot the ratio vs d13CC1 isotope
-btex_only <- gas_wattenberg %>% filter(btex_det == "Methane and BTEX")
 
 char_ch4_plot <- ggplot(gas_wattenberg, aes(x = `DELTA_13C_C1`, y = fraction, fill = btex_det)) +
       annotate("rect", xmin = -100, xmax = -55, ymin = 100, ymax = 1e5, alpha = 0.2) +
@@ -73,10 +69,11 @@ char_ch4_plot <- ggplot(gas_wattenberg, aes(x = `DELTA_13C_C1`, y = fraction, fi
       labs(x = "Delta 13C C1 (‰)",
            y = "C1/(C2 + C3)",
            fill = "BTEX Co-Occurrence") +
-           #title = "Bernard Plot",
-           #subtitle = "Methane origin as function of D13C and molar ratios") +
+      #title = "Bernard Plot",
+      #subtitle = "Methane origin as function of D13C and molar ratios") +
       annotate("text", x = -77, y = 1e4, label = "Biogenic", size = 6) +
       annotate("text", x = -46, y = 1, label = "Thermogenic", size = 6) + 
+      theme_bw() +
       theme(legend.position=c(0,0), legend.justification=c(0,0))
 char_ch4_plot
 
@@ -122,38 +119,39 @@ rm(list=ls())
 dat_all <- read.xlsx("Output/Final_Exports/BTEX_Cases_2021-11-17.xlsx")
 
 dat_plt <- dat_all %>%
-   filter(detected_ch4 == TRUE,
-          sampled_for_alkanes == TRUE,
-          sampled_for_btex == TRUE,
-          sampled_for_ch4 == TRUE,
-          complete.cases(methane, ethane, propane, delta_13c_c1))
+      filter(detected_ch4 == TRUE,
+             sampled_for_alkanes == TRUE,
+             sampled_for_btex == TRUE,
+             sampled_for_ch4 == TRUE,
+             complete.cases(methane, ethane, propane, delta_13c_c1))
 
 # Plot the ratio vs d13CC1 isotope
 bernard_plot <- ggplot(dat_plt, aes(x = `delta_13c_c1`, y = fraction)) +
-   
-   # Set up annotation rectangles for "origin" zones
-   annotate("rect", xmin = -100, xmax = -55, ymin = 100, ymax = 1e5, alpha = 0.2) +
-   annotate("rect", xmin = -55, xmax = -30, ymin = 0.1, ymax = 100, alpha = 0.2) +
-   
-   # Plot sample points
-   geom_point(size = 3, aes(fill = detected_propane_36, shape = detected_btex)) +
-   scale_fill_manual(values = c("cadetblue2", "darkorange2")) +
-   scale_shape_manual(values = c(21, 24)) +
-   
-   # Set axes and labels
-   coord_cartesian(ylim = c(1, 1e4), xlim = c(-90,-40)) +
-   scale_x_continuous(breaks = seq(-90,-40, 10)) +
-   scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
-                 labels = trans_format("log10", math_format(10^.x))) +
-   labs(x = "Delta 13C C1 (‰)",
-        y = "C1/(C2 + C3)",
-        fill = "Co-Occurrence of Propane-Hexane",
-        shape = "Co-Occurrence of BTEX",
-        title = "Bernard Plot",
-        subtitle = "Methane origin as function of D13C and molar ratios") +
-   annotate("text", x = -77, y = 1e4, label = "Biogenic", size = 6) +
-   annotate("text", x = -46, y = 1, label = "Thermogenic", size = 6) + 
-   theme(legend.position=c(0,0), legend.justification=c(0,0)) +
-   guides(fill=guide_legend(override.aes=list(shape=21)))
+      
+      # Set up annotation rectangles for "origin" zones
+      annotate("rect", xmin = -100, xmax = -55, ymin = 100, ymax = 1e5, alpha = 0.2) +
+      annotate("rect", xmin = -55, xmax = -30, ymin = 0.1, ymax = 100, alpha = 0.2) +
+      
+      # Plot sample points
+      geom_point(size = 3, aes(fill = detected_propane_36, shape = detected_btex)) +
+      scale_fill_manual(values = c("cadetblue2", "darkorange2")) +
+      scale_shape_manual(values = c(21, 24)) +
+      
+      # Set axes and labels
+      coord_cartesian(ylim = c(1, 1e4), xlim = c(-90,-40)) +
+      scale_x_continuous(breaks = seq(-90,-40, 10)) +
+      scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                    labels = trans_format("log10", math_format(10^.x))) +
+      labs(x = "Delta 13C C1 (‰)",
+           y = "C1/(C2 + C3)",
+           fill = "Co-Occurrence of Propane-Hexane",
+           shape = "Co-Occurrence of BTEX",
+           title = "Bernard Plot",
+           subtitle = "Methane origin as function of D13C and molar ratios") +
+      annotate("text", x = -77, y = 1e4, label = "Biogenic", size = 6) +
+      annotate("text", x = -46, y = 1, label = "Thermogenic", size = 6) +
+      theme_bw() +
+      theme(legend.position=c(0,0), legend.justification=c(0,0)) +
+      guides(fill=guide_legend(override.aes=list(shape=21)))
 
 bernard_plot

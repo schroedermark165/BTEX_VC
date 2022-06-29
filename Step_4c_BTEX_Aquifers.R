@@ -18,14 +18,9 @@
 library(tidyverse)
 library(janitor)
 library(openxlsx)
-library(ggsci)
 library(scales)
 library(gridExtra)
-library(mblm)
-library(arcgisbinding)
-library(sf)
 library(trend)
-arc.check_product()
 
 # Load Data ---------------------------------------------------------------
 rm(list=ls())
