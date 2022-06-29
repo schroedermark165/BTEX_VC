@@ -73,7 +73,7 @@ aquifer_plot <- ggplot(btex_l_det, aes(x = result,
                                                                  "ethylbenzene",
                                                                  "xylenes")))) +
       # geom_violin() +
-      geom_jitter(height = 0.1) +
+      geom_jitter(height = 0.2) +
       scale_x_continuous(limits = c(0, 250)) +
       
       scale_fill_manual(values = c("#33a02c", "#4A148C", "#1f78b4", "#a6cee3")) +
@@ -81,7 +81,8 @@ aquifer_plot <- ggplot(btex_l_det, aes(x = result,
       labs(x = "BTEX concentration (µg/l)",
            y = "aquifer",
            color = "analyte") +
-      theme_bw()
+      theme_bw() +
+      theme(legend.position = c(.82, .75))
 aquifer_plot
 
 ggsave(filename = paste0("Output/Final_Exports/figures/Figure_X_Aquifer_Detections.svg"),

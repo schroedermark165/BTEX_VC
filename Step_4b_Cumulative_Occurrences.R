@@ -27,6 +27,7 @@ library(mblm)
 library(arcgisbinding)
 library(sf)
 library(trend)
+library(here)
 arc.check_product()
 
 # Load Data ---------------------------------------------------------------
@@ -48,12 +49,12 @@ blankPlot <- ggplot()+geom_blank(aes(1,1))+
             axis.ticks = element_blank())
 
 # Read final cases
-d_cases <- read.xlsx("Output/Final_Exports/BTEX_Cases_2022-06-03.xlsx",
+d_cases <- read.xlsx(here("Output", "Final_Exports","BTEX_Cases_Exported_2022-06-03.xlsx"),
                      sheet = "BTEX Cases (Mean)",
                      detectDates = TRUE)
 
 # Read all sample summary (BTEX+Methane)
-d_summary <- read.xlsx("Output/Final_Exports/All_Samples_BTEX-CH4_2021-08-09.xlsx") %>%
+d_summary <- read.xlsx("Output/Final_Exports/All_Samples_BTEX-CH4_Exported_2021-08-09.xlsx") %>%
       mutate(sample_date = as.Date(sample_date.x, origin = "1899-12-30"),
              facility_id = as.character(facility_id.x)) %>%
       select(-c(facility_id.x, facility_id.y, sample_date.x, sample_date.y))
@@ -193,7 +194,7 @@ cumulative_btex_all <- ggplot() +
                                         y = id,
                                         fill = origin2),
                  shape = 21, size = 3) +
-      scale_fill_manual(values = c("#33a02c", "#4A148C", "#1f78b4", "#a6cee3")) +
+      scale_fill_manual(values = c("red", "#33a02c", "medium blue", "white")) +
       scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
                    breaks = "1 year",
                    date_labels = "%Y") +
