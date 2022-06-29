@@ -113,13 +113,3 @@ sf_gas_wd2 <- st_join(sf_gas_wd, sf_wattenberg, join = st_within) %>%
 Water_Wells_Sampled_Methane_Isotope <- data.frame(sf_gas_wd2) %>% select(-geometry)
 
 # saveRDS(Water_Wells_Sampled_Methane_Isotope, "Intermediate/Water_Wells_Sampled_Methane_Isotope.RDS")
-
-# Write Output ------------------------------------------------------------
-# feature_name_gas <- paste("D:/Google Drive/ArcGIS/DJ_Basin_BTEX_Study/Data/1_Geodatabase/Water_Wells.gdb/Water_Wells_Sampled_GAS_",
-#                           format(Sys.Date(), "%Y%m%d"), sep = "")
-# 
-# arc.write(path = file.path(feature_name_gas),
-#           data = sf_gas_wd2,
-#           shape_info = list(type = "Point", WKID = 26913),
-#           overwrite = TRUE)
-# write.xlsx(Water_Wells_Sampled_Methane_Isotope, paste0("Output/Water_Wells_Sampled_Methane_Isotope_", Sys.Date(), ".xlsx"))

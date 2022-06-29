@@ -23,10 +23,8 @@ library(openxlsx)
 library(ggsci)
 library(scales)
 library(gridExtra)
-library(mblm)
 library(arcgisbinding)
 library(sf)
-library(trend)
 library(here)
 arc.check_product()
 
@@ -54,10 +52,9 @@ d_cases <- read.xlsx(here("Output", "Final_Exports","BTEX_Cases_Exported_2022-06
                      detectDates = TRUE)
 
 # Read all sample summary (BTEX+Methane)
-d_summary <- read.xlsx("Output/Final_Exports/All_Samples_BTEX-CH4_Exported_2021-08-09.xlsx") %>%
-      mutate(sample_date = as.Date(sample_date.x, origin = "1899-12-30"),
-             facility_id = as.character(facility_id.x)) %>%
-      select(-c(facility_id.x, facility_id.y, sample_date.x, sample_date.y))
+d_summary <- read_csv("Output/Final_Exports/Summary_Table_Exported_2022-06-29.csv") %>%
+      filter(wattenberg == TRUE) %>%
+      mutate(facility_id = as.character(facility_id))
 
 # Read timeline of COGCC Rules
 d_rules <- read.xlsx("./../Manuscript/Manuscript_Tables.xlsx")
@@ -111,7 +108,7 @@ cumulative_ch4
 # Summarize BTEX Results
 # Get earliest detection of BTEX in each facid
 d_btex_gas <- d_summary %>%
-      filter(btex_det == TRUE) %>%
+      filter(detected_btex == TRUE) %>%
       mutate(origin2 = factor(origin,
                               levels = c("thermogenic",
                                          "mixed",
@@ -153,7 +150,7 @@ cumulative_btex_unique_id
 time_period <- "quarter"
 
 period_cases <- d_summary %>%
-      filter(btex_det == TRUE) %>%
+      filter(detected_btex == TRUE) %>%
       group_by(period = floor_date(sample_date, time_period)) %>%
       summarize(btex_occurrences = n())
 
@@ -167,7 +164,7 @@ period_samples <- d_summary %>%
       filter(period >= as.Date("2000-01-01"))
 
 d_btex_all <- d_summary %>%
-      filter(btex_det == TRUE) %>%
+      filter(detected_btex == TRUE) %>%
       mutate(origin2 = factor(origin,
                               levels = c("thermogenic",
                                          "mixed",
@@ -184,139 +181,51 @@ d_btex_all <- d_summary %>%
 
 # Plot BTEX cumulative occurrences
 cumulative_btex_all <- ggplot() +
-      # geom_bar(data = period_samples, stat = "identity", alpha = 0.5,
-      #          aes(x = period, y = normalized_cases*100)) +
-      # geom_vline(xintercept = c(d_rules$date), 
-      #            alpha = 0.5) +
-      # geom_text(data = d_rules, aes(x = date, y = 115, label = label), 
-      #           color = "black", size = 2.5, fontface = "bold", angle = 90, nudge_x = -66) +
       geom_point(data = d_btex_all, aes(x = sample_date, 
                                         y = id,
-                                        fill = origin2),
-                 shape = 21, size = 3) +
-      scale_fill_manual(values = c("red", "#33a02c", "medium blue", "white")) +
+                                        shape = factor(btex_above_mcl,
+                                                      levels = c(TRUE, FALSE),
+                                                      labels = c("exceeds Colorado MCL", "does not exceed Colorado MCL"))
+                                        ),
+                 size = 3) +
+      scale_shape_manual(values = c(16, 1), name="") +
       scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
                    breaks = "1 year",
                    date_labels = "%Y") +
       # scale_y_continuous(sec.axis = sec_axis(trans = ~./100, name = "BTEX Detections per Sample")) +
       labs(title = "cumulative occurrences of BTEX in water wells",
            subtitle = paste0("between ", format(min(d_btex_all$sample_date), "%Y"), " and 2020"),
-           fill = "co-occurring methane",
            x = "sample date",
            y = "cumulative BTEX detection") +
       theme_bw() +
-      theme(legend.position = c(0.01, 0.986), legend.justification = c(0,1))
+      theme(legend.position = c(0.01, 0.986), legend.justification = c(0,1), legend.title=element_blank())
 cumulative_btex_all
-
-norm_plt <- ggplot(period_samples, aes(x = period, y = normalized_cases)) +
-      # geom_line(period_samples, aes(x = period, y = normalized_cases)) +
-      # geom_point() +
-      geom_bar(stat = "identity") +
-      # geom_smooth(data = period_samples[period_samples$period > as.Date("2014-01-01"),],
-      #             aes(x=period, y=normalized_cases),
-      #             formula = y ~ x, se = FALSE, method = "lm", color = "black", size = 0.5) +
-      scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
-                   breaks = "1 year",
-                   minor_breaks = "3 months",
-                   date_labels = "%Y") +
-      labs(title = "number of BTEX detections normalized to number of samples",
-           subtitle = paste0("during a ", time_period, " period"),
-           x = "year",
-           y = "BTEX detections per sample") +
-      theme_bw()
-norm_plt
 
 # Plot # of samples tested for BTEX
 # Add it to the cumulative plot
 samples <- ggplot(d_summary %>% filter(sampled_for_btex == TRUE), 
                   aes(x = sample_date)) +
-      geom_histogram(binwidth = 365/4) +
+      geom_histogram(binwidth = 365/4,
+                     boundary = 365/4,
+                     # center = 0
+                     ) +
       geom_vline(xintercept = c(d_rules$date)) +
       geom_text(data = d_rules, aes(x = date, y = 150, label = label), 
                 color = "black", size = 2.5, fontface = "bold", angle = 90, nudge_x = -66) +
       scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
                    breaks = "1 year",
-                   minor_breaks = "3 months",
+                   minor_breaks = "6 months",
                    date_labels = "%Y") +
-      # scale_y_continuous(sec.axis = sec_axis(trans = ~.*100, name = "Number of Samples")) +
+      scale_y_continuous(limits = c(0, 200), expand = c(0, NA)) +
       labs(x = "sample date",
            y = "number of samples") +
       theme_bw()
-duo_plot <- grid.arrange(cumulative_btex_all, samples, ncol=1, nrow=2)
 
-#
-# Misc Backup -------------------------------------------------------------
-#Double plot Option
-cumulative_btex_all1 <- ggplot() +
-      geom_vline(xintercept = c(d_rules$date), 
-                 alpha = 0.5) +
-      geom_text(data = d_rules, aes(x = date, y = 115, label = label), 
-                color = "black", size = 2.5, fontface = "bold", angle = 90, nudge_x = -66) +
-      geom_point(data = d_btex_all, aes(x = sample_date, 
-                                        y = id,
-                                        fill = origin2),
-                 shape = 21, size = 3) +
-      scale_fill_manual(values = c("#33a02c", "#4A148C", "#1f78b4", "#a6cee3")) +
-      scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
-                   breaks = "1 year",
-                   date_labels = "%Y") +
-      labs(title = "Cumulative Occurrences of BTEX in Water Wells",
-           subtitle = paste0("Between ", format(min(d_btex_all$sample_date), "%Y"), " and 2020"),
-           fill = "Co-Occurring Methane",
-           x = "Sample Date",
-           y = "Cumulative BTEX Detection") +
-      theme(legend.position = c(0.01, 0.986), legend.justification = c(0,1))
-# cumulative_btex_all1
+duo_plot <- cowplot::plot_grid(cumulative_btex_all, samples, ncol=1, nrow=2, align = "v")
+duo_plot
 
-norm_plt <- ggplot(period_samples, aes(x = period, y = normalized_cases)) +
-      geom_vline(xintercept = c(d_rules$date)) +
-      geom_text(data = d_rules, aes(x = date, y = .29, label = label), 
-                color = "black", size = 2.5, fontface = "bold", angle = 90, nudge_x = -66) +
-      geom_line(period_samples, aes(x = period, y = normalized_cases)) +
-      geom_point() +
-      # geom_bar(stat = "identity") +
-      # geom_smooth(data = period_samples[period_samples$period > as.Date("2014-01-01"),],
-      #             aes(x=period, y=normalized_cases),
-      #             formula = y ~ x, se = FALSE, method = "lm", color = "black", size = 0.5) +
-      scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
-                   breaks = "1 year",
-                   date_labels = "%Y") +
-      labs(title = "Number of BTEX Detections Normalized to Number of Samples",
-           subtitle = paste0("During a ", time_period, " period"),
-           x = "Year",
-           y = "BTEX Detections per Sample")
-
-# norm_plt
-duo_plot <- grid.arrange(cumulative_btex_all1, norm_plt, ncol=1, nrow=2)
-
-# Mann Kendall stuff ------------------------------------------------------
-# Mann Kendall Trend Analysis
-# Test for whether BTEX detections per sample by year is increasing
-# Calculate MK parameters (intercept/slope/p/z/s)
-period_samples[is.na(period_samples)] <- 0
-
-mk <- period_samples %>%
-      mutate(date_num = as.numeric(period)) %>%
-      filter((period > as.Date("2014-01-01") & period <= as.Date("2020-01-01"))) %>%
-      arrange(desc(period)) %>%
-      do(intercept = mblm::mblm(normalized_cases ~ date_num,., repeated = T)$coefficients[[1]],
-         slope = mblm::mblm(normalized_cases ~ date_num,.,repeated=T)$coefficients[[2]],
-         mann_kendall_p = trend::mk.test(.$normalized_cases, alternative = "two.sided", continuity = TRUE)$p.value,
-         mann_kendall_Z = trend::mk.test(.$normalized_cases, alternative = "two.sided", continuity = TRUE)$statistic[["z"]],
-         mann_kendall_S = trend::mk.test(.$normalized_cases, alternative = "two.sided", continuity = TRUE)$estimate[["S"]])
-
-mk.test(mk$normalized_cases)
-
-# 1) Add a label to the MK results & replace slope/intercept values with zero IF the p value of MK test is > 0.05 (i.e. not statistically significant)
-mk.plot <- mk %>%
-      mutate(intercept = replace(intercept, mann_kendall_p > 0.05,0),
-             slope = replace(slope,mann_kendall_p > 0.05, 0),
-             plot = mann_kendall_p <= 0.05)
-
-summary_table <- mk %>%
-      mutate(mann_kendall_p = signif(mann_kendall_p, digits = 2),
-             mann_kendall_Z = signif(mann_kendall_Z, digits = 2),
-             trend = ifelse(mann_kendall_p <= 0.05, ifelse(slope < 0,"Decreasing","Increasing"),""),
-             intercept = replace(intercept, mann_kendall_p > 0.05, 0),
-             slope = replace(slope, mann_kendall_p > 0.05, 0),
-             plot = mann_kendall_p <= 0.05)
+ggsave("./../Manuscript/Figures/Figure_2_Cumulative_Occurrences.png",
+       height = 8,
+       width = 12,
+       units = "in",
+       dpi = 300)
