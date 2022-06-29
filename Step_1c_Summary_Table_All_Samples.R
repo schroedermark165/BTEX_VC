@@ -87,21 +87,21 @@ samples_water <- wells_sel %>%
       left_join(samples, by = c("facility_id")) %>%
       filter(matrix %in% c("WATER", "Water", "GW", "LIQUID", ""))
 
+# Summary of DLs - min/max per analyte
+# If positive result is above a DL=0, check if qualifier is ND
+det_lims <- readRDS("Intermediate/det_lim_summary.RDS") %>%
+      mutate(match_param = c("BENZENE", "TOLUENE", "ETHYLBENZENE", "m-+p-XYLENE", "o-XYLENE", "TOTAL XYLENES"))
+
 # Results for WATER Data (BTEX and Methane) -------------------------------
 # Cleanup sample results before left_joining to water wells
 # Make units consistent
 
 # Get BTEX detections
-# If positive result is above a DL=0, check if qualifier is ND
-det_lims <- readRDS("Intermediate/det_lim_summary.RDS") %>%
-      mutate(match_param = c("BENZENE", "TOLUENE", "ETHYLBENZENE", "m-+p-XYLENE", "o-XYLENE", "TOTAL XYLENES"))
-
 results_water_btex <- results %>%
       replace_na(list(detection_limit = 0)) %>%
       filter(param_description %in% btex) %>%
       # Convert all units to ug/l
-      mutate(chem_class = "BTEX",
-             result_ugL = case_when(units == "mg/L" ~ result_value*1000,
+      mutate(result_ugL = case_when(units == "mg/L" ~ result_value*1000,
                                     units %in% c("ug/L", "UG/L") ~ result_value,
                                     TRUE ~ result_value),
              detection_limit = case_when(units == "mg/L" ~ detection_limit*1000,
@@ -175,20 +175,19 @@ results_water_nd <- bind_rows(results_water_btex, results_water_ch4, results_wat
 
 # Join RESULT DATA with SAMPLE DATA ---------------------------------------
 # Select relevant columns
-d_water_nds <- samples_water %>%
-      inner_join(results_water_nd, by = c("sample_id")) %>%
+d_water_nds <- results_water_nd %>%
+      inner_join(samples_water, by = c("sample_id")) %>%
       select(facility_id, facility_type, utm_x83, utm_y83, county, permit_number,
              receipt_number, well_depth, sample_id, sample_date, matrix, sample_reason,
              result_id, param_description, result_ugL, qualifier, units2,
-             detection_limit, chem_class, sampled_for, co_mcl, above_co_mcl)
+             detection_limit, sampled_for, co_mcl, above_co_mcl)
 
 # Remove Trip Blanks and/or Contaminated Samples --------------------------
 
-# NOT NEEDED FOR METHANE - currently only care about origin (microbial or thermogenic)
 # df of the trip blanks with high values
 tb_fail <- samples_water %>%
       left_join(results_water_btex, by = c("sample_id")) %>%
-      filter(grepl("blank", sample_reason, ignore.case = T),
+      filter(grepl("blank", sample_reason, ignore.case = T), # when sample_reason == "blank" and result>DL, the blank is a failure
              !qualifier %in% c("U", "<", "ND"),
              result_value > detection_limit) %>%
       select(facility_id, sample_id, sample_date, sample_reason, param_description, result_ugL)
@@ -203,19 +202,21 @@ wells_tb_fail <- d_water_nds %>%
 d_water2 <- d_water_nds %>%
       filter(!grepl("blank", sample_reason, ignore.case = T),
              !sample_id %in% as.list(wells_tb_fail$sample_id)) %>%
-      replace_na(list(result_ugL=0)) %>%
+      replace_na(list(result_ugL=0))
+
+# Output and Tables for GIS -----------------------------------------------
+# Flag samples above MCL
+d_water2 <- d_water2 %>%
       # Flag sample if above MCL
       group_by(sample_id, facility_id, sample_date, above_co_mcl) %>%
       mutate(btex_above_mcl = ifelse(sum(above_co_mcl) > 0, TRUE, FALSE)) %>%
       ungroup()
 
-# Output and Tables for GIS -----------------------------------------------
-
 # Format output table of BTEX
 # Wide table of all samples and results for BTEX, CH4, and alkanes for easier reading
 d_water_wd <- d_water2 %>%
       pivot_wider(id_cols = c(facility_id, facility_type, utm_x83, utm_y83, permit_number,
-                              receipt_number, well_depth, matrix, sample_id, sample_date, btex_above_mcl),
+                              receipt_number, well_depth, matrix, sample_id, sample_date),
                   names_from = c(param_description),
                   values_from = c(result_ugL),
                   values_fn = max
@@ -234,12 +235,16 @@ d_water_wd <- d_water2 %>%
              pentane_mgl = `PENTANE`,
              hexanes_mgl = `HEXANES`) %>%
       relocate(c(benzene_ugl, toluene_ugl, ethylbenzene_ugl, mp_xylenes_ugl, o_xylene_ugl, tot_xylenes_ugl, methane_mgl),
-               .after = btex_above_mcl) %>%
+               .after = sample_date) %>%
       relocate(c(ethane_mgl, propane_mgl, butane_mgl, isobutane_mgl, pentane_mgl, hexanes_mgl),
                .after = methane_mgl) %>%
-      clean_names() %>%
+      clean_names()
+
+# Add summary cols to same df
+d_water_wd <- d_water_wd %>%
+      # sum concs for each analyte set per sample
       mutate(x = utm_x83, y = utm_y83,
-             # Get sums for each sample
+             # Get sums for each sample for tot btex, tot alkanes, etc
              sum_btex = rowSums(across(benzene_ugl:tot_xylenes_ugl), na.rm = TRUE),
              `sum_alk_2-6` = rowSums(across(ethane_mgl:hexanes_mgl), na.rm = TRUE),
              `sum_alk_3-6` = rowSums(across(propane_mgl:hexanes_mgl), na.rm = TRUE),
@@ -249,8 +254,13 @@ d_water_wd <- d_water2 %>%
              detected_ch4 = ifelse(!is.na(methane_mgl), TRUE, FALSE),
              detected_ethane_26 = ifelse(`sum_alk_2-6` > 0, TRUE, FALSE),
              detected_propane_36 = ifelse(`sum_alk_3-6` > 0, TRUE, FALSE),
-             detected_butane_46 = ifelse(`sum_alk_4-6` > 0, TRUE, FALSE),
-             btex_above_mcl = ifelse(is.na(btex_above_mcl), FALSE, btex_above_mcl))
+             detected_butane_46 = ifelse(`sum_alk_4-6` > 0, TRUE, FALSE)) %>%
+      # columns if BTEX is above the CO MCL
+      mutate(btex_above_mcl = ifelse(
+            (benzene_ugl >= 5 | toluene_ugl >= 560 | ethylbenzene_ugl >= 700 | tot_xylenes_ugl >= 1400),
+            TRUE,
+            FALSE),
+            btex_above_mcl = ifelse(is.na(btex_above_mcl), FALSE, btex_above_mcl))
 
 # This variable will tell whether analytes were sampled for
 sampled_for <- d_water2 %>%
@@ -287,32 +297,41 @@ exclude_facids <- data.frame(facility_id = c("700923","703535","705037","705043"
                                         "Contaminated monitoring well","Contaminated monitoring well","Permit does not exist"))
 
 sf_water_wd2 <- st_join(sf_water_wd, sf_wattenberg, join = st_within) %>%
-      filter(description == "2020 revision") %>%
-      select(-c(OBJECTID, description)) %>%
-      mutate(wattenberg = TRUE) %>%
-      select(-geometry) %>%
+      # Boolean TRUE/FALSE if facility loc is within Wattenberg field
+      mutate(wattenberg = if_else(description == "2020 revision", TRUE, FALSE, missing = FALSE)) %>%
+      select(-c(OBJECTID, geometry, description)) %>%
+      # Filter out facilities that should be manually excluded (see reason in above df)
       filter(!facility_id %in% as.list(exclude_facids$facility_id)) %>%
+      # format columns: (1) as char, (2) replace na's with 0
       mutate(facility_id = as.character(facility_id),
              across(`benzene_ugl`:`sum_alk_4-6`, ~replace_na(., 0))) %>%
       # Convert booleans to character for importing to GIS
       mutate(across(c(sample_date, detected_btex:wattenberg), as.character))
 
+# Create export table - formatted and ready for GIS
 summary_export <- as.data.frame(sf_water_wd2) %>% 
       select(-geometry) %>%
+      # convert col type
       mutate(sample_date = as.Date(sample_date)) %>%
+      # join isotope data - from the Step 1b script that gets gas data
       left_join(d_isotope, by = c("facility_id", "sample_date")) %>%
+      # join well info - permits, depths; these were manually found for wells w/ btex detections from DWR
       left_join(well_info, by = c("facility_id")) %>%
+      # reconcile permit and receipt column additions - add manual additions
       mutate(permit_number = case_when((is.na(permit_number.x) & !is.na(permit_number.y)) ~ permit_number.y,
                                        (!is.na(permit_number.x) & is.na(permit_number.y)) ~ permit_number.x,
                                        permit_number.x == permit_number.y ~ permit_number.x),
              receipt_number = case_when((is.na(receipt_number.x) & !is.na(receipt_number.y)) ~ receipt_number.y,
                                         (!is.na(receipt_number.x) & is.na(receipt_number.y)) ~ receipt_number.x,
                                         receipt_number.x == receipt_number.y ~ receipt_number.x)) %>%
+      # Remove samples without permit numbers
       filter(!is.na(permit_number)) %>%
       select(-c(permit_number.x, permit_number.y, receipt_number.x, receipt_number.y, utm_x83.y, utm_y83.y,
                 facility_type.y, well_depth.y)) %>%
+      # formatting table -> rename cols
       rename(utm_x83 = utm_x83.x, utm_y83 = utm_y83.x,
              facility_type = facility_type.x, well_depth = well_depth.x) %>%
+      # ONLY KEEP RECORDS WITH COORDS OR CAN'T IMPORT TO GIS
       filter(complete.cases(utm_x83, utm_y83))
 
 write.xlsx(summary_export,
