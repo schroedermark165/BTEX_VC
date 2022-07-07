@@ -23,10 +23,11 @@ library(openxlsx)
 library(ggsci)
 library(scales)
 library(gridExtra)
-library(arcgisbinding)
 library(sf)
 library(here)
-arc.check_product()
+
+# library(arcgisbinding)
+# arc.check_product()
 
 # Load Data ---------------------------------------------------------------
 
@@ -57,7 +58,7 @@ d_summary <- read_csv("Output/Final_Exports/Summary_Table_Exported_2022-06-29.cs
       mutate(facility_id = as.character(facility_id))
 
 # Read timeline of COGCC Rules
-d_rules <- read.xlsx("./../Manuscript/Manuscript_Tables.xlsx")
+# d_rules <- read.xlsx("./../Manuscript/Manuscript_Tables.xlsx")
 d_rules <- data.frame(date = as.Date(c("12-01-2005", "04-01-2009", "09-01-2011", "01-01-2012", "05-01-2013"), format="%m-%d-%Y"),
                       label = c("318A.e", "305.d", "318A.e(4)", "COGA", "609/318A.e/f"))
 
@@ -85,25 +86,6 @@ d_thermogenic <- d_gas2 %>%
       ungroup() %>%
       arrange(min_date) %>%
       mutate(id = 1:n())
-
-# Plot thermogenic cumulative occurrences
-cumulative_ch4 <- ggplot(data = d_thermogenic, aes(x = min_date, y = id, fill = factor(origin,
-                                                                                       levels = c("thermogenic",
-                                                                                                  "mixed")))) +
-      geom_point(shape = 21, size = 3) +
-      scale_x_date(breaks = "1 year",
-                   date_labels = "%Y") +
-      scale_fill_manual(values = c("#33a02c", "#a6cee3")) + 
-      labs(
-            title = "cumulative occurrences of thermogenic methane in water wells",
-            subtitle = paste0("between ", min(d_thermogenic$min_date)," and ", max(d_thermogenic$min_date)),
-            fill = "methane origin",
-            x = "sample date",
-            y = paste0("number of thermogenic methane detections (n = ", max(d_thermogenic$id), ")")
-            ) +
-      theme_bw() +
-      theme(legend.position=c(0.01,0.99), legend.justification=c(0,1))
-cumulative_ch4
 
 # Summarize BTEX Results
 # Get earliest detection of BTEX in each facid
@@ -175,7 +157,11 @@ d_btex_all <- d_summary %>%
                                          "microbial origin",
                                          "no co-occurring methane"),
                               ordered = TRUE,
-                              exclude = TRUE)) %>%
+                              exclude = TRUE),
+             btex_above_mcl = factor(btex_above_mcl,
+                                     levels = c(TRUE, FALSE),
+                                     labels = c("exceeds Colorado MCL",
+                                                "does not exceed Colorado MCL"))) %>%
       arrange(sample_date) %>%
       mutate(id = 1:n())
 
@@ -183,22 +169,25 @@ d_btex_all <- d_summary %>%
 cumulative_btex_all <- ggplot() +
       geom_point(data = d_btex_all, aes(x = sample_date, 
                                         y = id,
-                                        shape = factor(btex_above_mcl,
-                                                      levels = c(TRUE, FALSE),
-                                                      labels = c("exceeds Colorado MCL", "does not exceed Colorado MCL"))
-                                        ),
-                 size = 3) +
-      scale_shape_manual(values = c(16, 1), name="") +
+                                        shape = btex_above_mcl,
+                                        fill = btex_above_mcl,
+                                        size = btex_above_mcl)) +
+      scale_shape_manual(values = c(21, 21), name = "BTEX detection") +
+      scale_fill_manual(values = c("orange", "skyblue"), name = "BTEX detection") +
+      scale_size_manual(values = c(3, 3), name = "BTEX detection") +
       scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
                    breaks = "1 year",
                    date_labels = "%Y") +
-      # scale_y_continuous(sec.axis = sec_axis(trans = ~./100, name = "BTEX Detections per Sample")) +
-      labs(title = "cumulative occurrences of BTEX in water wells",
-           subtitle = paste0("between ", format(min(d_btex_all$sample_date), "%Y"), " and 2020"),
-           x = "sample date",
-           y = "cumulative BTEX detection") +
+      labs(x = "year",
+           y = "number of BTEX detections") +
       theme_bw() +
-      theme(legend.position = c(0.01, 0.986), legend.justification = c(0,1), legend.title=element_blank())
+      theme(legend.position = c(0.01, 0.986),
+            legend.justification = c(0,1), 
+            legend.title=element_blank(),
+            legend.background = element_rect(size=.5,
+                                             linetype= "solid",
+                                             color = "black") 
+            )
 cumulative_btex_all
 
 # Plot # of samples tested for BTEX
@@ -229,3 +218,25 @@ ggsave("./../Manuscript/Figures/Figure_2_Cumulative_Occurrences.png",
        width = 12,
        units = "in",
        dpi = 300)
+
+
+# Misc Plots/Data ---------------------------------------------------------
+
+# Plot thermogenic cumulative occurrences
+# cumulative_ch4 <- ggplot(data = d_thermogenic, aes(x = min_date, y = id, fill = factor(origin,
+#                                                                                        levels = c("thermogenic",
+#                                                                                                   "mixed")))) +
+#       geom_point(shape = 21, size = 3) +
+#       scale_x_date(breaks = "1 year",
+#                    date_labels = "%Y") +
+#       scale_fill_manual(values = c("#33a02c", "#a6cee3")) + 
+#       labs(
+#             title = "cumulative occurrences of thermogenic methane in water wells",
+#             subtitle = paste0("between ", min(d_thermogenic$min_date)," and ", max(d_thermogenic$min_date)),
+#             fill = "methane origin",
+#             x = "sample date",
+#             y = paste0("number of thermogenic methane detections (n = ", max(d_thermogenic$id), ")")
+#             ) +
+#       theme_bw() +
+#       theme(legend.position=c(0.01,0.99), legend.justification=c(0,1))
+# cumulative_ch4

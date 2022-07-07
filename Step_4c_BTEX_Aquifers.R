@@ -73,7 +73,11 @@ aquifer_plot <- ggplot(btex_l_det, aes(x = result,
                                                       levels = c("benzene",
                                                                  "toluene",
                                                                  "ethylbenzene",
-                                                                 "xylenes")))) +
+                                                                 "xylenes"),
+                                                      labels = c("benzene",
+                                                                 "toluene",
+                                                                 "ethylbenzene",
+                                                                 "total xylenes")))) +
       # geom_violin() +
       geom_jitter(height = 0.2) +
       scale_x_continuous(limits = c(0, 250)) +
@@ -84,7 +88,10 @@ aquifer_plot <- ggplot(btex_l_det, aes(x = result,
            y = "aquifer",
            color = "analyte") +
       theme_bw() +
-      theme(legend.position = c(.82, .75))
+      theme(legend.position = c(.82, .75),
+            legend.box.background = element_rect(size=.5,
+                                                 linetype= "solid",
+                                                 color = "black"))
 aquifer_plot
 
 ggsave(filename = paste0("Output/Final_Exports/figures/Figure_X_Aquifer_Detections.svg"),
@@ -98,7 +105,11 @@ depth_plot <- ggplot(btex_l_det, aes(x = result,
                                                       levels = c("benzene",
                                                                  "toluene",
                                                                  "ethylbenzene",
-                                                                 "xylenes")))) +
+                                                                 "xylenes"),
+                                                      labels = c("benzene",
+                                                                 "toluene",
+                                                                 "ethylbenzene",
+                                                                 "total xylenes")))) +
       # geom_violin() +
       geom_point() +
       geom_hline(yintercept = 0) +
@@ -113,7 +124,9 @@ depth_plot <- ggplot(btex_l_det, aes(x = result,
            color = "analyte") +
       theme_bw() +
       theme(legend.position = c(.84, .70),
-            legend.box.background = element_rect(colour = "black"))
+            legend.box.background = element_rect(size=.5,
+                                                 linetype= "solid",
+                                                 color = "black"))
 depth_plot
 
 ggsave(depth_plot,
