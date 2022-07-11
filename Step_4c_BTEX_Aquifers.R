@@ -24,7 +24,7 @@ library(scales)
 rm(list=ls())
 # graphics.off()
 
-btex <- read.xlsx("Output/Final_Exports/BTEX_Cases_Well_Data.xlsx") %>%
+btex <- openxlsx::read.xlsx("Output/Final_Exports/BTEX_Cases_Well_Data.xlsx") %>%
       # manually add depth to Facility ID:752587; permit  #: 234828
       # Source of depth: https://dwr.state.co.us/Tools/WellPermits/0479283
       mutate(well_depth = ifelse(facility_id == 752587, 780, well_depth))
