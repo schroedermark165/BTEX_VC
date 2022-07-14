@@ -123,6 +123,7 @@ cumulative_btex_unique_id <- ggplot(data = d_btex_gas, aes(x = earliest_detectio
            x = "sample date",
            y = "cumulative BTEX detection") +
       theme_bw() +
+      theme(axis.text.x=element_text(hjust=-0.5)) +
       theme(legend.position = c(0.01, 0.986), legend.justification = c(0,1))
 cumulative_btex_unique_id
 
@@ -163,7 +164,9 @@ d_btex_all <- d_summary %>%
                                      labels = c("exceeds Colorado MCL",
                                                 "does not exceed Colorado MCL"))) %>%
       arrange(sample_date) %>%
-      mutate(id = 1:n())
+      mutate(id = 1:n()) %>%
+      arrange(desc(btex_above_mcl)) %>%
+      select(sample_date, id, btex_above_mcl, origin2)
 
 # Plot BTEX cumulative occurrences
 cumulative_btex_all <- ggplot() +
@@ -177,18 +180,22 @@ cumulative_btex_all <- ggplot() +
       scale_size_manual(values = c(3, 3), name = "BTEX detection") +
       scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
                    breaks = "1 year",
-                   date_labels = "%Y") +
+                   minor_breaks = "6 month",
+                   date_labels = "%Y",
+                   expand = c(0, NA)) +
       labs(x = "year",
            y = "number of BTEX detections") +
       theme_bw() +
-      theme(legend.position = c(0.01, 0.986),
+      theme(legend.position = c(0.01, 0.97),
             legend.justification = c(0,1), 
-            legend.title=element_blank(),
+            legend.title = element_blank(),
             legend.background = element_rect(size=.5,
                                              linetype= "solid",
-                                             color = "black") 
+                                             color = "black"),
+            legend.spacing.y = unit(0, "pt"),
+            axis.text.x=element_text(hjust=-0.55)
             )
-cumulative_btex_all
+# cumulative_btex_all
 
 # Plot # of samples tested for BTEX
 # Add it to the cumulative plot
@@ -196,6 +203,7 @@ samples <- ggplot(d_summary %>% filter(sampled_for_btex == TRUE),
                   aes(x = sample_date)) +
       geom_histogram(binwidth = 365/4,
                      boundary = 365/4,
+                     alpha = 0.75
                      # center = 0
                      ) +
       geom_vline(xintercept = c(d_rules$date)) +
@@ -204,16 +212,18 @@ samples <- ggplot(d_summary %>% filter(sampled_for_btex == TRUE),
       scale_x_date(limits = as.Date(c("2001-01-01", "2020-01-01")),
                    breaks = "1 year",
                    minor_breaks = "6 months",
-                   date_labels = "%Y") +
+                   date_labels = "%Y",
+                   expand = c(0, NA)) +
       scale_y_continuous(limits = c(0, 200), expand = c(0, NA)) +
       labs(x = "sample date",
            y = "number of samples") +
-      theme_bw()
+      theme_bw() +
+      theme(axis.text.x=element_text(hjust=-0.55))
 
 duo_plot <- cowplot::plot_grid(cumulative_btex_all, samples, ncol=1, nrow=2, align = "v")
 duo_plot
 
-ggsave("./../Manuscript/Figures/Figure_2_Cumulative_Occurrences.png",
+ggsave("Output/Figures/Figure_2_Cumulative_Occurrences.png",
        height = 8,
        width = 12,
        units = "in",
