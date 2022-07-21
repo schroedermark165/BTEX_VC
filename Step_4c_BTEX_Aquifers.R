@@ -57,7 +57,8 @@ btex_l <- btex %>%
 
 btex_l_det <- btex_l %>%
       filter(analyte != "methane",
-             !is.na(aquifer)) %>%
+             !is.na(aquifer),
+             result != 0) %>%
       mutate(analyte2 = case_when(analyte %in% c("mp-xylenes", "o-xylene", "total xylenes") ~ "xylenes",
                                   TRUE ~ as.character(analyte)),
              analyte2 = factor(analyte2,
@@ -124,7 +125,9 @@ depth_plot <- ggplot() +
       scale_y_reverse(limits = c(1200, 0), 
                       breaks = seq(0, 1200, 200),
                       expand = c(NA, 0)) +
-      scale_x_continuous(limits = c(0, 1500)) +
+      scale_x_log10(limits = c(0.1, 1500),
+                    labels = scales::label_log()) +
+      # scale_x_continuous(limits = c(0, 1500)) +
       # scale_color_brewer(palette = "Set1") +
       labs(x = bquote("BTEX concentration " (µg~L^-1)),
            y = "depth of well screen (ft)",
