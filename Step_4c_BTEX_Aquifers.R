@@ -19,6 +19,7 @@ library(tidyverse)
 library(janitor)
 library(openxlsx)
 library(scales)
+library(ggpubr)
 
 # Load Data ---------------------------------------------------------------
 rm(list=ls())
@@ -29,6 +30,12 @@ btex <- openxlsx::read.xlsx("Output/Final_Exports/BTEX_Cases_Well_Data.xlsx") %>
       # Source of depth: https://dwr.state.co.us/Tools/WellPermits/0479283
       mutate(well_depth = ifelse(facility_id == 752587, 780, well_depth))
 
+aquifers <- data.frame(
+      aquifer = c("Surficial", "Upper Arapahoe", 
+                  "Lower Arapahoe", "Laramie-Fox Hills"),
+      upper_depth = c(0, 150, 200, 400),
+      lower_depth = c(75, 250, 500, 1200)
+)
 
 sel_cols <- c("benzene_ugl", "toluene_ugl", "ethylbenzene_ugl", "mp_xylenes_ugl",
               "o_xylene_ugl", "tot_xylenes_ugl", "methane_mgl")
@@ -94,32 +101,33 @@ aquifer_plot <- ggplot(btex_l_det, aes(x = result,
                                                  color = "black"))
 aquifer_plot
 
-ggsave(filename = paste0("Output/Final_Exports/figures/Figure_X_Aquifer_Detections.svg"),
+ggsave(filename = paste0("Output/Figures/Figure_X_Aquifer_Detections.svg"),
        width = 5, height = 3, units = "in",
        dpi = 300)
 
 # Plot concentrations by depth
-depth_plot <- ggplot(btex_l_det, aes(x = result,
-                                       y = well_depth,
-                                       color = factor(analyte2,
-                                                      levels = c("benzene",
-                                                                 "toluene",
-                                                                 "ethylbenzene",
-                                                                 "xylenes"),
-                                                      labels = c("benzene",
-                                                                 "toluene",
-                                                                 "ethylbenzene",
-                                                                 "total xylenes")))) +
-      # geom_violin() +
-      geom_point() +
+depth_plot <- ggplot() +
+      geom_point(data = btex_l_det,
+                 aes(x = result,
+                     y = well_depth,
+                     color = factor(analyte2,
+                                    levels = c("benzene",
+                                               "toluene",
+                                               "ethylbenzene",
+                                               "xylenes"),
+                                    labels = c("benzene",
+                                               "toluene",
+                                               "ethylbenzene",
+                                               "total xylenes")))) +
       geom_hline(yintercept = 0) +
-      scale_y_reverse(limits = c(1200, 0), 
-                      breaks = seq(0, 1200, 200),
-                      expand = c(NA, 0)) +
-      scale_x_continuous(limits = c(0, 250)) +
+      # geom_vline(xintercept = ) +
       scale_fill_manual(values = c("#33a02c", "#4A148C", "#1f78b4", "#a6cee3")) +
+      scale_y_reverse(limits = c(1400, 0), 
+                      breaks = seq(0, 1400, 200),
+                      expand = c(NA, 0)) +
+      scale_x_continuous(limits = c(0, 1500)) +
       # scale_color_brewer(palette = "Set1") +
-      labs(x = "BTEX concentration (µg/l)",
+      labs(x = bquote("BTEX concentration " (µg~L^-1)),
            y = "depth of well screen (ft)",
            color = "analyte") +
       theme_bw() +
@@ -130,7 +138,7 @@ depth_plot <- ggplot(btex_l_det, aes(x = result,
 depth_plot
 
 ggsave(depth_plot,
-       filename = paste0("./../Manuscript/Figures/Figure_5_Conc_vs_Depth.png"),
+       filename = paste0("Output/Figures/Figure_5_Conc_vs_Depth.png"),
        width = 5, height = 3, units = "in",
        dpi = 300)
 

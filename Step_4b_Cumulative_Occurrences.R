@@ -120,7 +120,7 @@ cumulative_btex_unique_id <- ggplot(data = d_btex_gas, aes(x = earliest_detectio
       labs(title = "cumulative occurrences of BTEX in water wells",
            subtitle = "between 2001 and 2020",
            fill = "co-occurring methane",
-           x = "sample date",
+           x = "year",
            y = "cumulative BTEX detection") +
       theme_bw() +
       theme(axis.text.x=element_text(hjust=-0.5)) +
@@ -215,7 +215,7 @@ samples <- ggplot(d_summary %>% filter(sampled_for_btex == TRUE),
                    date_labels = "%Y",
                    expand = c(0, NA)) +
       scale_y_continuous(limits = c(0, 200), expand = c(0, NA)) +
-      labs(x = "sample date",
+      labs(x = "year",
            y = "number of samples") +
       theme_bw() +
       theme(axis.text.x=element_text(hjust=-0.55))
