@@ -59,7 +59,16 @@ btex_l_det <- btex_l %>%
       filter(analyte != "methane",
              !is.na(aquifer)) %>%
       mutate(analyte2 = case_when(analyte %in% c("mp-xylenes", "o-xylene", "total xylenes") ~ "xylenes",
-                                  TRUE ~ as.character(analyte)))
+                                  TRUE ~ as.character(analyte)),
+             analyte2 = factor(analyte2,
+                               levels = c("benzene",
+                                          "toluene",
+                                          "ethylbenzene",
+                                          "xylenes"),
+                               labels = c("benzene",
+                                          "toluene",
+                                          "ethylbenzene",
+                                          "total xylenes")))
 
 
 # Make Plots --------------------------------------------------------------
@@ -76,15 +85,7 @@ aquifer_plot <- ggplot(btex_l_det, aes(x = result,
                                                              "upper arapahoe",
                                                              "surficial"),
                                                   ordered = FALSE), 
-                                       color = factor(analyte2,
-                                                      levels = c("benzene",
-                                                                 "toluene",
-                                                                 "ethylbenzene",
-                                                                 "xylenes"),
-                                                      labels = c("benzene",
-                                                                 "toluene",
-                                                                 "ethylbenzene",
-                                                                 "total xylenes")))) +
+                                       color = analyte2)) +
       # geom_violin() +
       geom_jitter(height = 0.2) +
       scale_x_continuous(limits = c(0, 250)) +
@@ -105,25 +106,23 @@ ggsave(filename = paste0("Output/Figures/Figure_X_Aquifer_Detections.svg"),
        width = 5, height = 3, units = "in",
        dpi = 300)
 
+mcls <- data.frame(
+      analyte2 = c("benzene", "toluene", "ethylbenzene", "total xylenes"),
+      mcl = c(5, 560, 700, 1400)
+)
+
 # Plot concentrations by depth
 depth_plot <- ggplot() +
+      geom_vline(data = mcls,
+                 aes(xintercept = mcl, color = analyte2)) +
       geom_point(data = btex_l_det,
                  aes(x = result,
                      y = well_depth,
-                     color = factor(analyte2,
-                                    levels = c("benzene",
-                                               "toluene",
-                                               "ethylbenzene",
-                                               "xylenes"),
-                                    labels = c("benzene",
-                                               "toluene",
-                                               "ethylbenzene",
-                                               "total xylenes")))) +
+                     color = analyte2)) +
       geom_hline(yintercept = 0) +
-      # geom_vline(xintercept = ) +
       scale_fill_manual(values = c("#33a02c", "#4A148C", "#1f78b4", "#a6cee3")) +
-      scale_y_reverse(limits = c(1400, 0), 
-                      breaks = seq(0, 1400, 200),
+      scale_y_reverse(limits = c(1200, 0), 
+                      breaks = seq(0, 1200, 200),
                       expand = c(NA, 0)) +
       scale_x_continuous(limits = c(0, 1500)) +
       # scale_color_brewer(palette = "Set1") +
