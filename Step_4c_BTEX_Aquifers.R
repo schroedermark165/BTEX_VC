@@ -25,6 +25,7 @@ library(ggpubr)
 rm(list=ls())
 # graphics.off()
 
+
 btex <- openxlsx::read.xlsx("Output/Final_Exports/BTEX_Cases_Well_Data.xlsx") %>%
       # manually add depth to Facility ID:752587; permit  #: 234828
       # Source of depth: https://dwr.state.co.us/Tools/WellPermits/0479283
@@ -75,52 +76,59 @@ btex_l_det <- btex_l %>%
 # Make Plots --------------------------------------------------------------
 
 # Plot concentrations by aquifer
-aquifer_plot <- ggplot(btex_l_det, aes(x = result,
-                                       y = factor(aquifer,
-                                                  levels = c("Laramie-Fox Hills",
-                                                             "Lower Arapahoe",
-                                                             "Upper Arapahoe",
-                                                             "Surficial"),
-                                                  labels = c("laramie-fox hills",
-                                                             "lower arapahoe",
-                                                             "upper arapahoe",
-                                                             "surficial"),
-                                                  ordered = FALSE), 
-                                       color = analyte2)) +
-      # geom_violin() +
-      geom_jitter(height = 0.2) +
-      scale_x_continuous(limits = c(0, 250)) +
-      
-      scale_fill_manual(values = c("#33a02c", "#4A148C", "#1f78b4", "#a6cee3")) +
-      # scale_color_brewer(palette = "Set1") +
-      labs(x = "BTEX concentration (µg/l)",
-           y = "aquifer",
-           color = "analyte") +
-      theme_bw() +
-      theme(legend.position = c(.82, .75),
-            legend.box.background = element_rect(size=.5,
-                                                 linetype= "solid",
-                                                 color = "black"))
-aquifer_plot
-
-ggsave(filename = paste0("Output/Figures/Figure_X_Aquifer_Detections.svg"),
-       width = 5, height = 3, units = "in",
-       dpi = 300)
+# aquifer_plot <- ggplot(btex_l_det, aes(x = result,
+#                                        y = factor(aquifer,
+#                                                   levels = c("Laramie-Fox Hills",
+#                                                              "Lower Arapahoe",
+#                                                              "Upper Arapahoe",
+#                                                              "Surficial"),
+#                                                   labels = c("laramie-fox hills",
+#                                                              "lower arapahoe",
+#                                                              "upper arapahoe",
+#                                                              "surficial"),
+#                                                   ordered = FALSE), 
+#                                        color = analyte2)) +
+#       geom_vline(data = mcls,
+#                  aes(xintercept = mcl)) +
+#       # geom_violin() +
+#       geom_jitter(height = 0.2) +
+#       scale_x_continuous(limits = c(0, 250)) +
+#       
+#       scale_fill_manual(values = c("#33a02c", "#4A148C", "#1f78b4", "#a6cee3")) +
+#       # scale_color_brewer(palette = "Set1") +
+#       labs(x = "BTEX concentration (µg/l)",
+#            y = "aquifer",
+#            color = "analyte") +
+#       theme_bw() +
+#       theme(legend.position = c(.82, .75),
+#             legend.box.background = element_rect(size=.5,
+#                                                  linetype= "solid",
+#                                                  color = "black"))
+# aquifer_plot
+# 
+# ggsave(filename = paste0("Output/Figures/Figure_X_Aquifer_Detections.svg"),
+#        width = 5, height = 3, units = "in",
+#        dpi = 300)
 
 mcls <- data.frame(
       analyte2 = c("benzene", "toluene", "ethylbenzene", "total xylenes"),
+      label = c("CO MCL benzene", "CO MCL toluene", "CO MCL ethylbenzene", "CO MCL total xylenes"),
+      depth = c(1000,1000,1000,1000),
       mcl = c(5, 560, 700, 1400)
 )
 
 # Plot concentrations by depth
 depth_plot <- ggplot() +
       geom_vline(data = mcls,
-                 aes(xintercept = mcl, color = analyte2)) +
+                 aes(xintercept = mcl),
+                 size=0.25) +
       geom_point(data = btex_l_det,
                  aes(x = result,
                      y = well_depth,
                      color = analyte2)) +
       geom_hline(yintercept = 0) +
+      geom_text(data = mcls, aes(x=mcl, y=depth, label=label),
+                angle=90, size=1.5, vjust=1.25) +
       scale_fill_manual(values = c("#33a02c", "#4A148C", "#1f78b4", "#a6cee3")) +
       scale_y_reverse(limits = c(1200, 0), 
                       breaks = seq(0, 1200, 200),
